@@ -13,7 +13,7 @@ TorqueBox.configure do
   queue "/queues/torquebox-playground" do
     durable false
     processor App::MessageProcessors::HpPublisher do
-      concurrency 100
+      concurrency 1
     end
   end
 
