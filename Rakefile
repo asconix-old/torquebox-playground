@@ -5,8 +5,11 @@ $stdout.print "--- Loading #{__FILE__}\n"
 require "rubygems"
 require "bundler/setup"
 
+require 'benchmark'
+
 Bundler.require
 
+require "torquebox-messaging"
 require "torquebox-rake-support"
 
 namespace :app do
@@ -24,27 +27,41 @@ namespace :app do
 
     counter = 0
 
-    queue.with_session(:tx => false) do |session|
-      options = queue.normalize_options(:persistent => false)
-      producer = session.instance_variable_get('@jms_session').create_producer(session.java_destination(queue))
-      1_000_000.times do
-        payload = Array.new(32){rand(36).to_s(36)}.join
-        message = TorqueBox::Messaging::Message.new(session.instance_variable_get('@jms_session'), payload, options[:encoding])
+#    time = Benchmark.realtime do
+#      queue.with_session(:tx => false) do |session| 
+#        100_000.times do
+#          payload = Array.new(32){rand(36).to_s(36)}.join
+#          session.publish(queue, payload, queue.normalize_options(:persistent => false))
+#          puts ">>> #{counter+=1} >>> #{payload} >>> Size: #{queue.count_messages} / #{queue.consumer_count}"
+#        end
+#      end
+#    end
+#    puts "Time elapsed #{time} seconds ..."
 
-        message.populate_message_headers(options)
-        message.populate_message_properties(options[:properties])
+    time = Benchmark.realtime do
+      queue.with_session(:tx => false) do |session|
+      	options = queue.normalize_options(:persistent => false)
+        producer = session.instance_variable_get('@jms_session').create_producer(session.java_destination(queue))
+        100_000.times do
+          payload = Array.new(32){rand(36).to_s(36)}.join
+          message = TorqueBox::Messaging::Message.new(session.instance_variable_get('@jms_session'), payload, options[:encoding])
 
-        producer.disable_message_id = true
-        producer.disable_message_timestamp = true
+          message.populate_message_headers(options)
+          message.populate_message_properties(options[:properties])
 
-        producer.send( message.jms_message,
-            options.fetch(:delivery_mode, producer.delivery_mode),
-            options.fetch(:priority, producer.priority),
-            options.fetch(:ttl, producer.time_to_live)
-        )
-        puts ">>> #{counter+=1} >>> #{payload} >>> Size: #{queue.count_messages} / #{queue.consumer_count}"
+          producer.disable_message_id = true
+          producer.disable_message_timestamp = true
+
+            producer.send( message.jms_message,
+              options.fetch(:delivery_mode, producer.delivery_mode),
+              options.fetch(:priority, producer.priority),
+              options.fetch(:ttl, producer.time_to_live)
+            )
+          puts ">>> #{counter+=1} >>> #{payload} >>> Size: #{queue.count_messages} / #{queue.consumer_count}"
+        end
       end
     end
+    puts "Time elapsed #{time} seconds ..."
 
   end
 
